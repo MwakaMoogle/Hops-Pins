@@ -3,6 +3,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, Platform } from 'react-native';
+import { TestFirestore } from './components/testFirestore';
 
 // Simple test screens
 function HomeScreen() {
@@ -46,6 +47,7 @@ export default function App() {
         <Tab.Screen name="Discover" component={DiscoverScreen} />
         <Tab.Screen name="History" component={HistoryScreen} />
         <Tab.Screen name="Profile" component={ProfileScreen} />
+        <Tab.Screen name="Test" component={TestFirestore} />
       </Tab.Navigator>
     </NavigationContainer>
   );
