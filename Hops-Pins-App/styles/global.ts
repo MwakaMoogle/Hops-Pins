@@ -4,7 +4,6 @@ export const globalStyles = StyleSheet.create({
     container: {
         flex: 1,
         padding: 16,
-        backgroundColor: '#ffffff',
     },
     text: {
         fontSize: 16,

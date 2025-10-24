@@ -1,8 +1,8 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import  Header  from './header';
-import  Footer  from './footer';
+import  Header  from './Header';
+import  Footer  from './Footer';
 
 type LayoutProps = {
     children: React.ReactNode;
