@@ -38,13 +38,28 @@ app/(tabs)/                     # File-based tab group (likely Expo Router)
   history.tsx                   # History tab
 
 app/components/                 # Reusable components
-  logDrink.tsx                  # Component to log drinks
-  mapContainer.tsx              # Map container component
-  pubCard.tsx                   # Card UI for a pub entry
-  searchTab.tsx                 # Search tab component
+  logDrink.tsx                  # Modal/form used to log a drink for a pub (records beer, quantity, notes)
+  mapContainer.tsx              # Map view wrapper that renders a map and markers for nearby pubs
+  pubCard.tsx                   # Small card component showing pub details (name, distance, thumbnail)
+  searchTab.tsx                 # Search UI used inside the Search tab (query input + results list)
 
 app/pubs/
   [id].tsx                      # Dynamic route for pub details
+```
+
+hooks/
+```
+useBeer.ts                       # Hook for beer-related data/logic
+usePubs.ts                       # Hook to fetch/list pubs
+```
+
+lib/
+```
+lib/firebase.ts                  # Firebase initialization/wrapper
+lib/api/
+  beer.ts                        # Beer-related API helpers
+  pubs.ts                        # Pubs API helpers
+  places.ts                      # Places API helpers (geocoding / maps)
 ```
 
 assets/
