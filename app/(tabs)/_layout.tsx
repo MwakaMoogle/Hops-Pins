@@ -1,7 +1,23 @@
-import { Tabs } from 'expo-router'
-import React from 'react'
+// app/(tabs)/_layout.tsx
+import { useAuthContext } from '@/contexts/AuthContext';
+import { Tabs, useRouter } from 'expo-router';
+import { useEffect } from 'react';
 
-const _layout = () => {
+export default function TabLayout() {
+  const { isAuthenticated, initialized } = useAuthContext();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (initialized && !isAuthenticated) {
+      // Redirect to login if not authenticated
+      router.replace('/(auth)/login');
+    }
+  }, [isAuthenticated, initialized]);
+
+  if (!initialized) {
+    return null; // Or a loading screen
+  }
+
   return (
     <Tabs>
       <Tabs.Screen
@@ -32,16 +48,6 @@ const _layout = () => {
           headerShown: false
         }}
       />
-      <Tabs.Screen
-        name="testFirebase"
-        options={{
-          title: 'Test',
-          headerShown: false
-        }}
-      />          
     </Tabs>
-    
-  )
+  );
 }
-
-export default _layout

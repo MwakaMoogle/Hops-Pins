@@ -10,7 +10,8 @@
       "@/hooks/*": ["./hooks/*"],
       "@/assets/*": ["./assets/*"],
       "@/types/*": ["./types/*"],
-      "@/data/*": ["./data/*"]
+      "@/data/*": ["./data/*"],
+      "@/contexts/*": ["./contexts/*"]
     },
     "resolveJsonModule": true,
     "esModuleInterop": true
@@ -24,7 +25,8 @@
     "nativewind-env.d.ts",
     "lib/**/*",
     "hooks/**/*",
-    "data/**/*"
+    "data/**/*",
+    "contexts/**/*",
+    "app/**/*"
   ]
 }
-
