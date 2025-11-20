@@ -1,4 +1,6 @@
 // lib/api/beer.ts
+import { AppError, handleApiError } from '@/lib/errorHandler';
+
 export interface Beer {
   id: number;
   name: string;
@@ -18,14 +20,18 @@ export const searchBeers = async (beerName: string): Promise<Beer[]> => {
     );
     
     if (!response.ok) {
-      throw new Error('Failed to fetch beers');
+      throw new AppError(
+        `HTTP error! status: ${response.status}`,
+        'HTTP_ERROR',
+        'Failed to fetch beer data.'
+      );
     }
     
     const beers: Beer[] = await response.json();
     return beers;
-  } catch (error) {
-    console.error('Error fetching beers:', error);
-    return [];
+  } catch (error: any) {
+    if (error instanceof AppError) throw error;
+    throw handleApiError(error);
   }
 };
 
@@ -34,13 +40,13 @@ export const getRandomBeer = async (): Promise<Beer | null> => {
     const response = await fetch('https://api.punkapi.com/v2/beers/random');
     
     if (!response.ok) {
-      throw new Error('Failed to fetch random beer');
+      throw new AppError(`HTTP error! status: ${response.status}`, 'HTTP_ERROR');
     }
     
     const beers: Beer[] = await response.json();
     return beers[0] || null;
-  } catch (error) {
-    console.error('Error fetching random beer:', error);
-    return null;
+  } catch (error: any) {
+    if (error instanceof AppError) throw error;
+    throw handleApiError(error);
   }
 };

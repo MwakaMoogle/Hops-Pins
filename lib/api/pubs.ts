@@ -1,4 +1,5 @@
 // lib/api/pubs.ts
+import { handleFirebaseError } from '@/lib/errorHandler';
 import { db } from '@/lib/firebase';
 import { addDoc, collection, doc, getDoc, getDocs, orderBy, query, Timestamp, updateDoc, where } from 'firebase/firestore';
 
@@ -50,76 +51,95 @@ export const getPubByPlaceId = async (placeId: string): Promise<Pub | null> => {
 };
 
 // Pub operations - UPDATED to handle duplicate pubs and safe data
-export const addPub = async (pubData: Omit<Pub, 'id' | 'createdAt' | 'totalCheckins' | 'averageRating'>) => {
-  // Check if pub already exists by placeId
-  if (pubData.placeId) {
-    const existingPub = await getPubByPlaceId(pubData.placeId);
-    if (existingPub) {
-      return existingPub.id; // Return existing pub ID
+export const addPub = async (pubData: Omit<Pub, 'id' | 'createdAt' | 'totalCheckins' | 'averageRating'>): Promise<string> => {
+  try {
+    // Check if pub already exists by placeId
+    if (pubData.placeId) {
+      const existingPub = await getPubByPlaceId(pubData.placeId);
+      if (existingPub) {
+        return existingPub.id;
+      }
     }
-  }
 
-  const docRef = await addDoc(pubsRef, {
-    ...pubData,
-    totalCheckins: 0,
-    averageRating: 0,
-    createdAt: Timestamp.now(),
-  });
-  return docRef.id;
+    const docRef = await addDoc(pubsRef, {
+      ...pubData,
+      totalCheckins: 0,
+      averageRating: 0,
+      createdAt: Timestamp.now(),
+    });
+    return docRef.id;
+  } catch (error: any) {
+    throw handleFirebaseError(error);
+  }
 };
 
 export const getPubs = async (): Promise<Pub[]> => {
-  const querySnapshot = await getDocs(pubsRef);
-  return querySnapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  } as Pub));
+  try {
+    const querySnapshot = await getDocs(pubsRef);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Pub));
+  } catch (error: any) {
+    throw handleFirebaseError(error);
+  }
 };
 
 export const getPubById = async (pubId: string): Promise<Pub | null> => {
-  const docRef = doc(db, 'pubs', pubId);
-  const docSnap = await getDoc(docRef);
-  
-  if (docSnap.exists()) {
-    return { id: docSnap.id, ...docSnap.data() } as Pub;
+  try {
+    const docRef = doc(db, 'pubs', pubId);
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      return { id: docSnap.id, ...docSnap.data() } as Pub;
+    }
+    return null;
+  } catch (error: any) {
+    throw handleFirebaseError(error);
   }
-  return null;
 };
 
-// Checkin operations
-export const addCheckin = async (checkinData: Omit<Checkin, 'id' | 'createdAt'>) => {
-  const docRef = await addDoc(checkinsRef, {
-    ...checkinData,
-    createdAt: Timestamp.now(),
-  });
-
-  // Update pub's checkin count and average rating
-  const pubRef = doc(db, 'pubs', checkinData.pubId);
-  const pubDoc = await getDoc(pubRef);
-  
-  if (pubDoc.exists()) {
-    const pubData = pubDoc.data();
-    const newTotalCheckins = (pubData.totalCheckins || 0) + 1;
-    const newAverageRating = ((pubData.averageRating || 0) * (newTotalCheckins - 1) + checkinData.rating) / newTotalCheckins;
-
-    await updateDoc(pubRef, {
-      totalCheckins: newTotalCheckins,
-      averageRating: Math.round(newAverageRating * 10) / 10, // Round to 1 decimal
+export const addCheckin = async (checkinData: Omit<Checkin, 'id' | 'createdAt'>): Promise<string> => {
+  try {
+    const docRef = await addDoc(checkinsRef, {
+      ...checkinData,
+      createdAt: Timestamp.now(),
     });
-  }
 
-  return docRef.id;
+    // Update pub's checkin count and average rating
+    const pubRef = doc(db, 'pubs', checkinData.pubId);
+    const pubDoc = await getDoc(pubRef);
+    
+    if (pubDoc.exists()) {
+      const pubData = pubDoc.data();
+      const newTotalCheckins = (pubData.totalCheckins || 0) + 1;
+      const newAverageRating = ((pubData.averageRating || 0) * (newTotalCheckins - 1) + checkinData.rating) / newTotalCheckins;
+
+      await updateDoc(pubRef, {
+        totalCheckins: newTotalCheckins,
+        averageRating: Math.round(newAverageRating * 10) / 10,
+      });
+    }
+
+    return docRef.id;
+  } catch (error: any) {
+    throw handleFirebaseError(error);
+  }
 };
 
 export const getUserCheckins = async (userId: string): Promise<Checkin[]> => {
-  const q = query(
-    checkinsRef, 
-    where('userId', '==', userId),
-    orderBy('createdAt', 'desc')
-  );
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  } as Checkin));
+  try {
+    const q = query(
+      checkinsRef, 
+      where('userId', '==', userId),
+      orderBy('createdAt', 'desc')
+    );
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Checkin));
+  } catch (error: any) {
+    throw handleFirebaseError(error);
+  }
 };

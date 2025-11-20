@@ -33,7 +33,7 @@ const _layout = () => {
         }}
       />
       <Tabs.Screen
-        name="test-firestore"
+        name="testFirebase"
         options={{
           title: 'Test',
           headerShown: false

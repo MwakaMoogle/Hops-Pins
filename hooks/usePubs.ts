@@ -1,12 +1,13 @@
 // hooks/usePubs.ts
 import { searchPubsNearby } from '@/lib/api/places';
 import { Pub, addCheckin, addPub, getPubByPlaceId, getPubs } from '@/lib/api/pubs';
+import { AppError } from '@/lib/errorHandler';
 import { useEffect, useState } from 'react';
 
 export const usePubs = () => {
   const [pubs, setPubs] = useState<Pub[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<AppError | null>(null); // Change to AppError | null
 
   const loadPubs = async () => {
     setLoading(true);
@@ -16,7 +17,11 @@ export const usePubs = () => {
       setPubs(pubsData);
     } catch (error: any) {
       console.error('Error loading pubs:', error);
-      setError(error.message || 'Failed to load pubs');
+      if (error instanceof AppError) {
+        setError(error);
+      } else {
+        setError(new AppError(error.message, 'UNKNOWN_ERROR', 'Failed to load pubs'));
+      }
     } finally {
       setLoading(false);
     }
@@ -29,18 +34,14 @@ export const usePubs = () => {
       const places = await searchPubsNearby(latitude, longitude);
       
       if (places.length === 0) {
-        setError('No pubs found in this area');
+        setError(new AppError('No pubs found', 'NO_RESULTS', 'No pubs found in this area'));
         return;
       }
       
-      // Convert PlaceResults to Pub format and save to Firestore
       const newPubs: Pub[] = [];
       
-      for (const place of places.slice(0, 5)) { // Limit to 5 pubs for testing
-        // Skip if place doesn't have required data
-        if (!place.name || !place.geometry?.location) {
-          continue;
-        }
+      for (const place of places.slice(0, 5)) {
+        if (!place.name || !place.geometry?.location) continue;
 
         const pubData = {
           name: place.name,
@@ -60,9 +61,12 @@ export const usePubs = () => {
           }
         } catch (error: any) {
           console.error('Error adding pub:', error);
-          // Don't stop the whole process if one pub fails
           if (error.code === 'permission-denied') {
-            setError('Permission denied: Check Firestore rules');
+            setError(new AppError(
+              error.message, 
+              'PERMISSION_DENIED', 
+              'Authentication required to save pubs'
+            ));
           }
         }
       }
@@ -70,11 +74,23 @@ export const usePubs = () => {
       if (newPubs.length > 0) {
         setPubs(newPubs);
       } else {
-        setError('Could not save any pubs to database');
+        setError(new AppError(
+          'No pubs saved', 
+          'SAVE_FAILED', 
+          'Could not save any pubs to database'
+        ));
       }
     } catch (error: any) {
       console.error('Error searching nearby pubs:', error);
-      setError(error.message || 'Failed to search for pubs');
+      if (error instanceof AppError) {
+        setError(error);
+      } else {
+        setError(new AppError(
+          error.message, 
+          'SEARCH_ERROR', 
+          'Failed to search for pubs'
+        ));
+      }
     } finally {
       setLoading(false);
     }
@@ -87,7 +103,15 @@ export const usePubs = () => {
       await loadPubs();
     } catch (error: any) {
       console.error('Error creating checkin:', error);
-      setError(error.message || 'Failed to create checkin');
+      if (error instanceof AppError) {
+        setError(error);
+      } else {
+        setError(new AppError(
+          error.message, 
+          'CHECKIN_ERROR', 
+          'Failed to create checkin'
+        ));
+      }
       throw error;
     }
   };
