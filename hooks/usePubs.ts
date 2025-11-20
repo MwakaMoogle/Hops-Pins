@@ -2,6 +2,7 @@
 import { searchPubsNearby } from '@/lib/api/places';
 import { Pub, addCheckin, addPub, getPubByPlaceId, getPubs } from '@/lib/api/pubs';
 import { AppError } from '@/lib/errorHandler';
+import { MapMarker } from '@/types/map';
 import { useEffect, useState } from 'react';
 
 export const usePubs = () => {
@@ -116,6 +117,19 @@ export const usePubs = () => {
     }
   };
 
+  const convertPubsToMarkers = (pubs: Pub[]): MapMarker[] => {
+  return pubs.map(pub => ({
+    id: pub.id,
+    coordinate: {
+      latitude: pub.location.latitude,
+      longitude: pub.location.longitude,
+    },
+    title: pub.name,
+    description: pub.location.address,
+    pinColor: '#8B5CF6', // Purple color
+  }));
+};
+
   useEffect(() => {
     loadPubs();
   }, []);
@@ -127,5 +141,6 @@ export const usePubs = () => {
     loadPubs,
     searchNearbyPubs,
     createCheckin,
+    markers: convertPubsToMarkers(pubs),
   };
 };
