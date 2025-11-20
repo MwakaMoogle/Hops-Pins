@@ -9,16 +9,22 @@
       "@/lib/*": ["./lib/*"],
       "@/hooks/*": ["./hooks/*"],
       "@/assets/*": ["./assets/*"],
-      "@/types/*": ["./types/*"]
-    }
+      "@/types/*": ["./types/*"],
+      "@/data/*": ["./data/*"]
+    },
+    "resolveJsonModule": true,
+    "esModuleInterop": true
   },
   "include": [
     "**/*.ts",
     "**/*.tsx",
+    "**/*.json",
     ".expo/types/**/*.ts",
     "expo-env.d.ts",
     "nativewind-env.d.ts",
     "lib/**/*",
-    "hooks/**/*"
+    "hooks/**/*",
+    "data/**/*"
   ]
 }
+

@@ -1,0 +1,70 @@
+{
+  "beers": [
+    {
+      "id": 1,
+      "name": "Punk IPA",
+      "tagline": "Post Modern Classic. Spiky. Tropical. Hoppy.",
+      "first_brewed": "04/2007",
+      "description": "Our flagship beer that kick started the craft beer revolution.",
+      "image_url": "https://images.punkapi.com/v2/192.png",
+      "abv": 6.0,
+      "ibu": 60,
+      "food_pairing": ["Spicy carne asada", "Grilled chicken", "Chocolate cake"]
+    },
+    {
+      "id": 2,
+      "name": "Pilsner Lager",
+      "tagline": "Unleash the Yeast Series.",
+      "first_brewed": "09/2013",
+      "description": "Our Unleash the Yeast series was an epic experiment into the differences in aroma and flavour provided by switching up your yeast.",
+      "image_url": "https://images.punkapi.com/v2/4.png",
+      "abv": 6.3,
+      "ibu": 55,
+      "food_pairing": ["Spicy crab cakes", "Basil chicken", "Caramel toffee"]
+    },
+    {
+      "id": 3,
+      "name": "American Pale Ale",
+      "tagline": "A Real Bitter Experience.",
+      "first_brewed": "09/2007",
+      "description": "A hop-forward American Pale Ale with a balanced bitterness and citrus aroma.",
+      "image_url": "https://images.punkapi.com/v2/33.png",
+      "abv": 5.2,
+      "ibu": 45,
+      "food_pairing": ["Fried fish tacos", "Sharp cheddar", "Lemon tart"]
+    },
+    {
+      "id": 4,
+      "name": "Stout",
+      "tagline": "Dark & Roasty.",
+      "first_brewed": "01/2010",
+      "description": "A rich, dark stout with notes of coffee and chocolate.",
+      "image_url": "https://images.punkapi.com/v2/34.png",
+      "abv": 5.8,
+      "ibu": 40,
+      "food_pairing": ["Chocolate desserts", "Grilled meats", "Oysters"]
+    },
+    {
+      "id": 5,
+      "name": "Wheat Beer",
+      "tagline": "Refreshing & Citrusy.",
+      "first_brewed": "06/2012",
+      "description": "A light, refreshing wheat beer with citrus notes.",
+      "image_url": "https://images.punkapi.com/v2/35.png",
+      "abv": 4.8,
+      "ibu": 15,
+      "food_pairing": ["Salads", "Seafood", "Citrus desserts"]
+    },
+    {
+      "id": 6,
+      "name": "Double IPA",
+      "tagline": "Hoppy & Strong.",
+      "first_brewed": "03/2015",
+      "description": "A bold, hoppy double IPA with intense flavor.",
+      "image_url": "https://images.punkapi.com/v2/36.png",
+      "abv": 8.5,
+      "ibu": 85,
+      "food_pairing": ["Spicy foods", "Strong cheeses", "Barbecue"]
+    }
+  ]
+}

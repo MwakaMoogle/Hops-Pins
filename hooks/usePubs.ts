@@ -1,14 +1,16 @@
 // hooks/usePubs.ts
 import { searchAllPubsNearby } from '@/lib/api/places';
-import { Pub, addCheckin, addPub, getPubByPlaceId, getPubs } from '@/lib/api/pubs';
+import { Pub, addCheckin, addPub, getPubByPlaceId, getPubCheckins, getPubs } from '@/lib/api/pubs';
 import { AppError } from '@/lib/errorHandler';
 import { MapMarker } from '@/types/map';
 import { useEffect, useState } from 'react';
+
 
 export const usePubs = () => {
   const [pubs, setPubs] = useState<Pub[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<AppError | null>(null); // Change to AppError | null
+  const [pubCheckins, setPubCheckins] = useState<{[key: string]: any[]}>({});
 
   const loadPubs = async () => {
     setLoading(true);
@@ -120,6 +122,18 @@ export const usePubs = () => {
     }
   };
 
+  const loadPubCheckins = async (pubId: string) => {
+    try {
+      const checkins = await getPubCheckins(pubId);
+      setPubCheckins(prev => ({
+        ...prev,
+        [pubId]: checkins
+      }));
+    } catch (error) {
+      console.error('Error loading pub checkins:', error);
+    }
+  };  
+
   const convertPubsToMarkers = (pubs: Pub[]): MapMarker[] => {
   return pubs.map(pub => ({
     id: pub.id,
@@ -141,9 +155,11 @@ export const usePubs = () => {
     pubs,
     loading,
     error,
+    pubCheckins,
     loadPubs,
     searchNearbyPubs,
     createCheckin,
     markers: convertPubsToMarkers(pubs),
+    loadPubCheckins,
   };
 };

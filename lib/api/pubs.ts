@@ -1,7 +1,18 @@
 // lib/api/pubs.ts
 import { handleFirebaseError } from '@/lib/errorHandler';
 import { db } from '@/lib/firebase';
-import { addDoc, collection, doc, getDoc, getDocs, orderBy, query, Timestamp, updateDoc, where } from 'firebase/firestore';
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  orderBy,
+  query,
+  Timestamp,
+  updateDoc,
+  where
+} from 'firebase/firestore';
 
 // Collection references
 export const pubsRef = collection(db, 'pubs');
@@ -50,7 +61,7 @@ export const getPubByPlaceId = async (placeId: string): Promise<Pub | null> => {
   return null;
 };
 
-// Pub operations - UPDATED to handle duplicate pubs and safe data
+// Pub operations
 export const addPub = async (pubData: Omit<Pub, 'id' | 'createdAt' | 'totalCheckins' | 'averageRating'>): Promise<string> => {
   try {
     // Check if pub already exists by placeId
@@ -99,6 +110,7 @@ export const getPubById = async (pubId: string): Promise<Pub | null> => {
   }
 };
 
+// Checkin operations
 export const addCheckin = async (checkinData: Omit<Checkin, 'id' | 'createdAt'>): Promise<string> => {
   try {
     const docRef = await addDoc(checkinsRef, {
@@ -141,5 +153,26 @@ export const getUserCheckins = async (userId: string): Promise<Checkin[]> => {
     } as Checkin));
   } catch (error: any) {
     throw handleFirebaseError(error);
+  }
+};
+
+export const getPubCheckins = async (pubId: string): Promise<Checkin[]> => {
+  try {
+    // Now we can use the efficient query with ordering thanks to the index
+    const q = query(
+      checkinsRef, 
+      where('pubId', '==', pubId),
+      orderBy('createdAt', 'desc') // This now works with the index
+    );
+    const querySnapshot = await getDocs(q);
+    
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Checkin));
+  } catch (error: any) {
+    console.error('Error loading pub checkins:', error);
+    // Return empty array for better UX - don't break the app
+    return [];
   }
 };

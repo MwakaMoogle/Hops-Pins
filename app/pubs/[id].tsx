@@ -1,27 +1,30 @@
 // app/pubs/[id].tsx
+import CheckinHistory from '@/components/CheckinHistory';
+import DrinkSearch from '@/components/DrinkSearch';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { useAuth } from '@/hooks/useAuth';
 import { usePubs } from '@/hooks/usePubs';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
 const PubDetails = () => {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const { pubs, createCheckin, loading: checkinLoading } = usePubs();
+  const { pubs, createCheckin, loading: checkinLoading, pubCheckins, loadPubCheckins } = usePubs();
   const { user, loading: authLoading } = useAuth();
   
   const [selectedDrink, setSelectedDrink] = useState('');
   const [rating, setRating] = useState(0);
-  const [customDrink, setCustomDrink] = useState('');
+  const [note, setNote] = useState('');
 
-  const pub = pubs.find(p => p.id === id);
+  const pub = pubs.find(p => p.id === id as string);
 
-  const popularDrinks = [
-    'Pint of Lager', 'Craft IPA', 'Guinness', 'Pale Ale', 
-    'Cider', 'Wine', 'G&T', 'Whiskey', 'Vodka Coke'
-  ];
+  useEffect(() => {
+    if (pub) {
+      loadPubCheckins(pub.id);
+    }
+  }, [pub]);
 
   const handleCheckin = async () => {
     if (!user) {
@@ -29,10 +32,8 @@ const PubDetails = () => {
       return;
     }
 
-    const finalDrink = selectedDrink === 'Other' ? customDrink : selectedDrink;
-    
-    if (!finalDrink.trim()) {
-      Alert.alert('Select a Drink', 'Please select or enter a drink for your check-in.');
+    if (!selectedDrink) {
+      Alert.alert('Select a Drink', 'Please select a drink for your check-in.');
       return;
     }
 
@@ -46,13 +47,19 @@ const PubDetails = () => {
         userId: user.uid,
         pubId: pub!.id,
         pubName: pub!.name,
-        drink: finalDrink,
+        drink: selectedDrink,
         rating: rating,
-        note: `Rated ${rating} stars`
+        note: note || `Rated ${rating} stars`
       });
       
-      Alert.alert('Success!', `Checked in at ${pub!.name} with ${finalDrink} ⭐${rating}`);
-      router.back();
+      // Reload checkins after successful checkin
+      loadPubCheckins(pub!.id);
+      
+      Alert.alert('Success!', `Checked in at ${pub!.name} with ${selectedDrink} ⭐${rating}`);
+      // Reset form
+      setSelectedDrink('');
+      setRating(0);
+      setNote('');
     } catch (error) {
       Alert.alert('Error', 'Failed to check in. Please try again.');
     }
@@ -79,6 +86,8 @@ const PubDetails = () => {
       </View>
     );
   }
+
+  const currentPubCheckins = pubCheckins[pub.id] || [];
 
   return (
     <ScrollView className="flex-1 bg-white" showsVerticalScrollIndicator={false}>
@@ -111,50 +120,24 @@ const PubDetails = () => {
         <View className="bg-white border border-gray-200 rounded-xl p-5 mb-6 shadow-sm">
           <Text className="text-xl font-bold text-gray-800 mb-4">Check In</Text>
           
-          {/* Drink Selection */}
-          <Text className="text-sm font-medium text-gray-700 mb-3">What are you drinking?</Text>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            className="mb-4"
-          >
-            <View className="flex-row">
-              {[...popularDrinks, 'Other'].map((drink) => (
-                <TouchableOpacity
-                  key={drink}
-                  onPress={() => {
-                    setSelectedDrink(drink);
-                    if (drink !== 'Other') setCustomDrink('');
-                  }}
-                  className={`px-4 py-3 rounded-full mr-2 ${
-                    selectedDrink === drink ? 'bg-purple-600' : 'bg-gray-100'
-                  }`}
-                >
-                  <Text className={
-                    selectedDrink === drink ? 'text-white font-medium' : 'text-gray-700'
-                  }>
-                    {drink}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
+          {/* Enhanced Drink Search */}
+          <DrinkSearch 
+            onDrinkSelect={setSelectedDrink}
+            selectedDrink={selectedDrink}
+          />
 
-          {/* Custom Drink Input */}
-          {selectedDrink === 'Other' && (
-            <View className="mb-4">
-              <Text className="text-sm font-medium text-gray-700 mb-2">Enter your drink:</Text>
-              <View className="bg-gray-50 rounded-lg p-3">
-                <Text className="text-gray-800">
-                  {customDrink || 'Type your drink here...'}
-                </Text>
-              </View>
+          {/* Current Selection Display */}
+          {selectedDrink && (
+            <View className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+              <Text className="text-green-800 font-medium">
+                Selected: {selectedDrink}
+              </Text>
             </View>
           )}
 
           {/* Rating */}
           <Text className="text-sm font-medium text-gray-700 mb-3">Rate this pub:</Text>
-          <View className="flex-row justify-center mb-6">
+          <View className="flex-row justify-center mb-4">
             {[1, 2, 3, 4, 5].map((star) => (
               <TouchableOpacity
                 key={star}
@@ -168,6 +151,16 @@ const PubDetails = () => {
             ))}
           </View>
 
+          {/* Optional Note */}
+          <View className="mb-4">
+            <Text className="text-sm font-medium text-gray-700 mb-2">Add a note (optional):</Text>
+            <View className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+              <Text className="text-gray-800">
+                {note || 'Great atmosphere, friendly staff...'}
+              </Text>
+            </View>
+          </View>
+
           {/* Check-in Button */}
           <TouchableOpacity
             onPress={handleCheckin}
@@ -179,13 +172,19 @@ const PubDetails = () => {
             }`}
           >
             <Text className="text-white font-semibold text-lg">
-              {checkinLoading ? 'Checking in...' : 'Check In Now'}
+              {checkinLoading ? 'Checking in...' : `Check In with ${selectedDrink}`}
             </Text>
           </TouchableOpacity>
         </View>
 
+        {/* Check-in History */}
+        <CheckinHistory 
+          checkins={currentPubCheckins}
+          pubId={pub.id}
+        />
+
         {/* Pub Information */}
-        <View className="bg-gray-50 rounded-xl p-5">
+        <View className="bg-gray-50 rounded-xl p-5 mt-6">
           <Text className="text-lg font-bold text-gray-800 mb-3">Pub Information</Text>
           <View className="space-y-2">
             <View className="flex-row items-center">
@@ -198,22 +197,7 @@ const PubDetails = () => {
                 {pub.location.latitude.toFixed(4)}, {pub.location.longitude.toFixed(4)}
               </Text>
             </View>
-            <View className="flex-row items-center">
-              <Text className="text-gray-500 w-24">Place ID:</Text>
-              <Text className="text-gray-800 flex-1 text-xs">{pub.placeId || 'N/A'}</Text>
-            </View>
           </View>
-        </View>
-
-        {/* Coming Soon Features */}
-        <View className="mt-6 p-4 bg-blue-50 rounded-xl">
-          <Text className="text-lg font-bold text-blue-800 mb-2">Coming Soon</Text>
-          <Text className="text-blue-600 text-sm">
-            • Photos from Google Places{'\n'}
-            • Opening hours{'\n'}
-            • User reviews and photos{'\n'}
-            • Drink menu integration
-          </Text>
         </View>
       </View>
     </ScrollView>
