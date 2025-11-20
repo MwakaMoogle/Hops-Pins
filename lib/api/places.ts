@@ -4,7 +4,8 @@ const GOOGLE_PLACES_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
 export interface PlaceResult {
   place_id: string;
   name: string;
-  formatted_address: string;
+  formatted_address?: string;
+  vicinity?: string;
   geometry: {
     location: {
       lat: number;
@@ -29,7 +30,10 @@ export const searchPubsNearby = async (latitude: number, longitude: number, radi
     const data = await response.json();
     
     if (data.status === 'OK') {
-      return data.results;
+      // Filter out invalid results
+      return data.results.filter((place: any) => 
+        place.name && place.geometry?.location
+      );
     } else {
       console.error('Google Places API error:', data.status);
       return [];
@@ -37,25 +41,5 @@ export const searchPubsNearby = async (latitude: number, longitude: number, radi
   } catch (error) {
     console.error('Error fetching nearby pubs:', error);
     return [];
-  }
-};
-
-export const getPlaceDetails = async (placeId: string): Promise<PlaceResult | null> => {
-  try {
-    const response = await fetch(
-      `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,formatted_address,geometry,rating,photos,opening_hours&key=${GOOGLE_PLACES_API_KEY}`
-    );
-    
-    const data = await response.json();
-    
-    if (data.status === 'OK') {
-      return data.result;
-    } else {
-      console.error('Google Places details error:', data.status);
-      return null;
-    }
-  } catch (error) {
-    console.error('Error fetching place details:', error);
-    return null;
   }
 };

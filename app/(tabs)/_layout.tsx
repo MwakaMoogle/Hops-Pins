@@ -32,6 +32,13 @@ const _layout = () => {
           headerShown: false
         }}
       />
+      <Tabs.Screen
+        name="test-firestore"
+        options={{
+          title: 'Test',
+          headerShown: false
+        }}
+      />          
     </Tabs>
     
   )

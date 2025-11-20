@@ -19,4 +19,7 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 
+// Note: We'll add persistence later if needed
+// For now, this will eliminate the import error
+
 export default app;
