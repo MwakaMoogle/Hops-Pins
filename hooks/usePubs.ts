@@ -1,5 +1,5 @@
 // hooks/usePubs.ts
-import { searchPubsNearby } from '@/lib/api/places';
+import { searchAllPubsNearby } from '@/lib/api/places';
 import { Pub, addCheckin, addPub, getPubByPlaceId, getPubs } from '@/lib/api/pubs';
 import { AppError } from '@/lib/errorHandler';
 import { MapMarker } from '@/types/map';
@@ -32,7 +32,8 @@ export const usePubs = () => {
     setLoading(true);
     setError(null);
     try {
-      const places = await searchPubsNearby(latitude, longitude);
+      // Use the new paginated search function
+      const places = await searchAllPubsNearby(latitude, longitude);
       
       if (places.length === 0) {
         setError(new AppError('No pubs found', 'NO_RESULTS', 'No pubs found in this area'));
@@ -41,7 +42,8 @@ export const usePubs = () => {
       
       const newPubs: Pub[] = [];
       
-      for (const place of places.slice(0, 5)) {
+      // Process ALL pubs found, not just first 5
+      for (const place of places) {
         if (!place.name || !place.geometry?.location) continue;
 
         const pubData = {
@@ -74,6 +76,7 @@ export const usePubs = () => {
       
       if (newPubs.length > 0) {
         setPubs(newPubs);
+        console.log(`Loaded ${newPubs.length} pubs in the area`);
       } else {
         setError(new AppError(
           'No pubs saved', 
@@ -126,7 +129,7 @@ export const usePubs = () => {
     },
     title: pub.name,
     description: pub.location.address,
-    pinColor: '#8B5CF6', // Purple color
+    pinColor: '#8B5CF6',
   }));
 };
 

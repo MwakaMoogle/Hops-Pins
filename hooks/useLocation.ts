@@ -53,8 +53,8 @@ export const useLocation = () => {
       const userLocation: UserLocation = {
         latitude: currentLocation.coords.latitude,
         longitude: currentLocation.coords.longitude,
-        latitudeDelta: 0.0922,
-        longitudeDelta: 0.0421,
+        latitudeDelta: 0.05, // Increased from 0.0922 for wider view
+        longitudeDelta: 0.05, // Increased from 0.0421 for wider view
       };
 
       setLocation(userLocation);
@@ -71,8 +71,8 @@ export const useLocation = () => {
       const fallbackLocation: UserLocation = {
         latitude: 51.5074,
         longitude: -0.1278,
-        latitudeDelta: 0.0922,
-        longitudeDelta: 0.0421,
+        latitudeDelta: 0.1, 
+        longitudeDelta: 0.1,
       };
       
       setLocation(fallbackLocation);
