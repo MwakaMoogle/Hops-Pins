@@ -1,8 +1,8 @@
 // hooks/useAuth.ts
+import { getUserProfile, updateUserProfile, UserProfile } from '@/lib/api/users';
+import { getCurrentUser, logout, onAuthStateChange, signIn, signUp } from '@/lib/auth';
 import { User } from 'firebase/auth';
 import { useEffect, useState } from 'react';
-import { getCurrentUser, logout, onAuthStateChange, signIn, signUp } from '../lib/api/auth';
-import { getUserProfile, updateUserProfile, UserProfile } from '../lib/api/users';
 
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);

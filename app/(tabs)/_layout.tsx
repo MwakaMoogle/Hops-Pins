@@ -1,21 +1,31 @@
 // app/(tabs)/_layout.tsx
 import { useAuthContext } from '@/contexts/AuthContext';
+import { useGuestContext } from '@/contexts/GuestContext';
 import { Tabs, useRouter } from 'expo-router';
 import { useEffect } from 'react';
 
 export default function TabLayout() {
   const { isAuthenticated, initialized } = useAuthContext();
+  const { isGuest } = useGuestContext();
   const router = useRouter();
 
   useEffect(() => {
-    if (initialized && !isAuthenticated) {
-      // Redirect to login if not authenticated
-      router.replace('/(auth)/login');
+    if (initialized) {
+      // Allow access if authenticated OR in guest mode
+      const shouldRedirect = !isAuthenticated && !isGuest;
+      if (shouldRedirect) {
+        router.replace('/(auth)/login' as any);
+      }
     }
-  }, [isAuthenticated, initialized]);
+  }, [isAuthenticated, initialized, isGuest]);
 
   if (!initialized) {
-    return null; // Or a loading screen
+    return null;
+  }
+
+  // Don't show tabs if not authenticated and not guest
+  if (!isAuthenticated && !isGuest) {
+    return null;
   }
 
   return (

@@ -14,10 +14,12 @@ export interface UserProfile {
   bio?: string;
 }
 
+// Update the parameter type to accept createdAt
 export const createUserProfile = async (userId: string, userData: {
   email: string;
   displayName: string;
   photoURL?: string;
+  createdAt?: Date; // Make this optional
 }) => {
   try {
     const userRef = doc(db, 'users', userId);
@@ -25,7 +27,7 @@ export const createUserProfile = async (userId: string, userData: {
       ...userData,
       uid: userId,
       totalCheckins: 0,
-      createdAt: Timestamp.now(),
+      createdAt: userData.createdAt ? Timestamp.fromDate(userData.createdAt) : Timestamp.now(),
       lastLogin: Timestamp.now(),
     });
   } catch (error) {
@@ -75,4 +77,4 @@ export const incrementUserCheckins = async (userId: string) => {
   } catch (error) {
     console.error('Error incrementing user checkins:', error);
   }
-}; 
+};

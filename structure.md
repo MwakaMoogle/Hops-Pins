@@ -1,70 +1,4 @@
-# Project Structure: Hops-Pins
-
-This file is an explicit, text-based layout of the repository and its main files so you can quickly understand the project's organization.
-
-Root files
-```
-app.json
-package.json
-package-lock.json
-README.md
-.gitignore
-babel.config.js
-metro.config.js
-eslint.config.js
-tailwind.config.js
-tsconfig.json
-nativewind.env.d.ts
-nativewind-env.d.ts
-structure.md        # (this file)
-```
-
-.vscode/
-```
-settings.json
-extensions.json
-```
-
-app/ (source)
-```
-app/_layout.tsx                 # App-level layout (root router entry)
-app/global.css                  # Global styles
-
-app/(tabs)/                     # File-based tab group (likely Expo Router)
-  _layout.tsx                   # Layout for tab group
-  index.tsx                     # Main/home tab
-  search.tsx                    # Search tab
-  profile.tsx                   # Profile tab
-  history.tsx                   # History tab
-
-app/components/                 # Reusable components
-  logDrink.tsx                  # Modal/form used to log a drink for a pub (records beer, quantity, notes)
-  mapContainer.tsx              # Map view wrapper that renders a map and markers for nearby pubs
-  pubCard.tsx                   # Small card component showing pub details (name, distance, thumbnail)
-  searchTab.tsx                 # Search UI used inside the Search tab (query input + results list)
-
-app/pubs/
-  [id].tsx                      # Dynamic route for pub details
-```
-
-hooks/
-```
-useBeer.ts                       # Hook for beer-related data/logic
-usePubs.ts                       # Hook to fetch/list pubs
-```
-
-lib/
-```
-lib/firebase.ts                  # Firebase initialization/wrapper
-lib/api/
-  beer.ts                        # Beer-related API helpers
-  pubs.ts                        # Pubs API helpers
-  places.ts                      # Places API helpers (geocoding / maps)
-```
-
-assets/
-````markdown
-# Project Structure: Hops-Pins
+## Project Structure: Hops-Pins
 
 This file is an explicit, text-based layout of the repository and its main files so you can quickly understand the project's organization.
 
@@ -95,7 +29,13 @@ extensions.json
 app/ (source)
 ```
 app/_layout.tsx                 # App-level layout (root router entry)
-app/global.css                  # Global styles
+  - imports `app/global.css` to load Tailwind/NativeWind utilities
+app/global.css                  # Global styles (Tailwind directives)
+
+app/(auth)/                     # Auth routes
+  _layout.tsx                   # Auth layout
+  login.tsx                     # Login screen
+  signup.tsx                    # Signup screen
 
 app/(tabs)/                     # File-based tab group (likely Expo Router)
   _layout.tsx                   # Layout for tab group
@@ -103,14 +43,16 @@ app/(tabs)/                     # File-based tab group (likely Expo Router)
   search.tsx                    # Search tab
   profile.tsx                   # Profile tab
   history.tsx                   # History tab
-  testFirebase.tsx              # ad-hoc/test screen for Firebase checks
 
 app/components/                 # Reusable components
+  CheckinHistory.tsx            # Component showing recent check-ins
+  DrinkSearch.tsx               # Beer search UI used in log flow
   ErrorDisplay.tsx              # Simple component to show error messages
   LoadingSpinner.tsx            # Small loading spinner
   logDrink.tsx                  # Modal/form used to log a drink for a pub (records beer, quantity, notes)
   mapContainer.tsx              # Map view wrapper that renders a map and markers for nearby pubs
   pubCard.tsx                   # Small card component showing pub details (name, distance, thumbnail)
+  RealMap.tsx                   # Map+marker rendering helper (wrapper around react-native-maps)
   searchTab.tsx                 # Search UI used inside the Search tab (query input + results list)
 
 app/pubs/
@@ -121,16 +63,20 @@ hooks/
 ```
 useBeer.ts                       # Hook for beer-related data/logic (fetch, caching helpers)
 usePubs.ts                       # Hook to fetch and filter nearby pubs
+useAuth.ts                       # Hook that wraps auth state and helpers
+useLocation.ts                   # Hook for device location (wrapper around expo-location)
 ```
 
 lib/
 ```
 lib/firebase.ts                  # Firebase initialization and helpers (auth, firestore)
 lib/errorHandler.ts              # Centralized error-handling utilities
+lib/auth.ts                      # Auth helpers (wrappers for firebase auth)
 lib/api/
   beer.ts                        # Beer-related API helpers
   pubs.ts                        # Pubs API helpers (CRUD + queries)
   places.ts                      # Places / maps API helpers (geocoding, distance)
+  users.ts                       # Users API helpers
 ```
 
 assets/
@@ -160,8 +106,10 @@ Notes & Observations
   - The presence of `app/_layout.tsx` and the `(tabs)` folder indicates a file-based routing system (Expo Router or similar).
   - `app/pubs/[id].tsx` is a dynamic route for individual pub pages.
 
-- Styling:
+- Styling & NativeWind:
   - `tailwind.config.js` and `nativewind*.d.ts` indicate Tailwind CSS / NativeWind is used for styling.
+  - The app's root layout (`app/_layout.tsx`) imports `app/global.css` which contains Tailwind directives (`@tailwind base; @tailwind components; @tailwind utilities;`). This import is required so the generated utility styles are available at runtime.
+  - Babel and Metro config should include NativeWind setup (`nativewind` in `package.json`, `nativewind/babel` in Babel config, and `nativewind/metro` usage in `metro.config.js`).
 
 - Platform:
   - The configuration and asset naming (icons, splash) suggest this is an Expo-managed React Native app.
@@ -188,6 +136,20 @@ Repository snapshot (generated by `./scripts/tree.sh`)
 │       ├── profile.tsx
 │       ├── search.tsx
 │       └── testFirebase.tsx
+│   ├── (auth)
+│   │   ├── _layout.tsx
+│   │   ├── login.tsx
+│   │   └── signup.tsx
+│   └── components
+│       ├── CheckinHistory.tsx
+│       ├── DrinkSearch.tsx
+│       ├── ErrorDisplay.tsx
+│       ├── LoadingSpinner.tsx
+│       ├── logDrink.tsx
+│       ├── mapContainer.tsx
+│       ├── pubCard.tsx
+│       ├── RealMap.tsx
+│       └── searchTab.tsx
 ├── app.json
 ├── assets
 │   └── images
@@ -248,6 +210,4 @@ How to use this file
   - Commit these changes and open a PR with the updated documentation.
 
 ---
-Generated on: 2025-11-20
-
-````
+Generated on: 2025-11-21

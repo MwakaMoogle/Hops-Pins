@@ -1,5 +1,6 @@
 // app/(auth)/signup.tsx
 import { useAuthContext } from '@/contexts/AuthContext';
+import { useGuestContext } from '@/contexts/GuestContext';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -7,6 +8,7 @@ import { Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'reac
 export default function SignupScreen() {
   const router = useRouter();
   const { signUp, loading, error, clearError } = useAuthContext();
+  const { setGuest } = useGuestContext();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -124,7 +126,10 @@ export default function SignupScreen() {
 
           {/* Continue as Guest */}
           <TouchableOpacity
-            onPress={() => router.replace('/(tabs)')}
+            onPress={() => {
+              setGuest(true); // Set guest mode
+              router.replace('/(tabs)' as any);
+            }}
             className="py-3 rounded-lg items-center border border-gray-300 mt-4"
           >
             <Text className="text-gray-700 font-medium">Continue as Guest</Text>
