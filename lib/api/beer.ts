@@ -1,6 +1,39 @@
 // lib/api/beer.ts
 import fallbackBeersData from '@/data/fallbackBeers.json';
+import { CacheManager } from '@/lib/cache';
 import { AppError, handleApiError } from '@/lib/errorHandler';
+
+class RateLimiter {
+  private static requests: number[] = [];
+  private static readonly MAX_REQUESTS_PER_MINUTE = 50; // Conservative limit
+  
+  static canMakeRequest(): boolean {
+    const now = Date.now();
+    const oneMinuteAgo = now - 60000;
+    
+    // Remove requests older than 1 minute
+    this.requests = this.requests.filter(time => time > oneMinuteAgo);
+    
+    // Check if we're under the limit
+    return this.requests.length < this.MAX_REQUESTS_PER_MINUTE;
+  }
+  
+  static recordRequest(): void {
+    this.requests.push(Date.now());
+  }
+  
+  static getWaitTime(): number {
+    const now = Date.now();
+    const oneMinuteAgo = now - 60000;
+    this.requests = this.requests.filter(time => time > oneMinuteAgo);
+    
+    if (this.requests.length === 0) return 0;
+    
+    // Return time until the oldest request is 1 minute old
+    const oldestRequest = Math.min(...this.requests);
+    return Math.max(0, (oldestRequest + 60000) - now);
+  }
+}
 
 export interface Beer {
   id: string;
@@ -30,6 +63,11 @@ const RAPID_API_BASE = 'https://beer9.p.rapidapi.com';
 const RAPID_API_KEY = process.env.EXPO_PUBLIC_RAPID_API_KEY;
 const RAPID_API_HOST = 'beer9.p.rapidapi.com';
 
+// Generate cache key for beer searches
+const getBeerCacheKey = (query: string, type: 'search' | 'random' | 'all' = 'search') => {
+  return `beer_${type}_${query.toLowerCase().trim()}`;
+};
+
 // Helper function to make RapidAPI requests
 const makeRapidApiRequest = async (endpoint: string, params: Record<string, string> = {}): Promise<any> => {
   if (!RAPID_API_KEY) {
@@ -40,14 +78,25 @@ const makeRapidApiRequest = async (endpoint: string, params: Record<string, stri
     );
   }
 
+  // Check rate limit
+  if (!RateLimiter.canMakeRequest()) {
+    const waitTime = RateLimiter.getWaitTime();
+    throw new AppError(
+      `Rate limit exceeded. Please wait ${Math.ceil(waitTime / 1000)} seconds`,
+      'RATE_LIMIT_EXCEEDED',
+      'Too many requests. Please wait a moment and try again.'
+    );
+  }
+
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout for RapidAPI
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
   
-  // Build query string from params
   const queryParams = new URLSearchParams(params).toString();
   const url = `${RAPID_API_BASE}${endpoint}${queryParams ? `?${queryParams}` : ''}`;
   
   console.log('🔍 Making API request to:', url);
+  
+  RateLimiter.recordRequest(); // Record this request
   
   const response = await fetch(url, {
     signal: controller.signal,
@@ -60,18 +109,12 @@ const makeRapidApiRequest = async (endpoint: string, params: Record<string, stri
   
   clearTimeout(timeoutId);
   
-  if (!response.ok) {
-    if (response.status === 404) {
-      throw new AppError(
-        'Beer not found',
-        'NOT_FOUND',
-        'No beers found matching your search.'
-      );
-    }
+  // Handle rate limiting (429 status)
+  if (response.status === 429) {
     throw new AppError(
-      `HTTP error! status: ${response.status}`,
-      'HTTP_ERROR',
-      'Failed to fetch beer data from Beer API.'
+      'Rate limit exceeded',
+      'RATE_LIMIT_EXCEEDED',
+      'Too many requests. Please wait a moment and try again.'
     );
   }
   
@@ -80,15 +123,18 @@ const makeRapidApiRequest = async (endpoint: string, params: Record<string, stri
     url, 
     status: data.code, 
     error: data.error, 
-    dataCount: Array.isArray(data.data) ? data.data.length : data.data ? 1 : 0 
+    dataCount: Array.isArray(data.data) ? data.data.length : data.data ? 1 : 0,
+    httpStatus: response.status
   });
   
-  // Check RapidAPI response structure
-  if (data.error) {
+  // Check for API errors in response body
+  if (data.error || data.code === 404 || response.status !== 200) {
     throw new AppError(
-      data.message || 'API returned error',
-      'API_ERROR',
-      'Failed to fetch beer data.'
+      data.message || `HTTP error! status: ${response.status}`,
+      response.status === 429 ? 'RATE_LIMIT_EXCEEDED' : 'API_ERROR',
+      response.status === 429 
+        ? 'Too many requests. Please wait a moment and try again.'
+        : 'Failed to fetch beer data.'
     );
   }
   
@@ -134,6 +180,15 @@ const transformBeerData = (rapidApiBeer: any): Beer => {
 export const searchBeers = async (beerName: string): Promise<Beer[]> => {
   console.log('🍺 Searching beers for:', beerName);
   
+  // Check cache first
+  const cacheKey = getBeerCacheKey(beerName, 'search');
+  const cached = await CacheManager.get<Beer[]>(cacheKey);
+  
+  if (cached) {
+    console.log('📦 Using cached beer results for:', beerName);
+    return cached;
+  }
+
   try {
     // Use query parameters as shown in the documentation
     const data = await makeRapidApiRequest('/', { name: beerName });
@@ -153,7 +208,10 @@ export const searchBeers = async (beerName: string): Promise<Beer[]> => {
     
     if (beers.length > 0) {
       const transformedBeers = beers.map(transformBeerData);
-      console.log(`✅ Successfully transformed ${transformedBeers.length} beers`);
+      
+      // Cache the results
+      await CacheManager.set(cacheKey, transformedBeers);
+      console.log(`✅ Successfully transformed and cached ${transformedBeers.length} beers`);
       return transformedBeers;
     }
     
@@ -165,6 +223,8 @@ export const searchBeers = async (beerName: string): Promise<Beer[]> => {
     );
     
     if (filteredFallback.length > 0) {
+      // Cache fallback results too
+      await CacheManager.set(cacheKey, filteredFallback);
       console.log(`🔄 Using ${filteredFallback.length} fallback beers`);
       return filteredFallback;
     }
@@ -174,6 +234,13 @@ export const searchBeers = async (beerName: string): Promise<Beer[]> => {
   } catch (error: any) {
     console.log('💥 Error in searchBeers:', error.message);
     
+    // Try to return cached data even if API fails
+    const cached = await CacheManager.get<Beer[]>(cacheKey);
+    if (cached) {
+      console.log('🔄 Using cached data due to API error');
+      return cached;
+    }
+
     if (error instanceof AppError && error.code === 'NOT_FOUND') {
       // Beer not found in API, try fallback
       console.log('🔄 Beer not found in API, trying fallback data');
@@ -214,11 +281,19 @@ export const searchBeers = async (beerName: string): Promise<Beer[]> => {
 export const getRandomBeer = async (): Promise<Beer | null> => {
   console.log('🎲 Getting random beer');
   
+  // For random beers, we'll cache by the search term used
+  const commonTerms = ['ipa', 'lager', 'ale', 'stout', 'pilsner', 'wheat'];
+  const randomTerm = commonTerms[Math.floor(Math.random() * commonTerms.length)];
+  const cacheKey = getBeerCacheKey(randomTerm, 'random');
+
+  // Check cache first - this is crucial to avoid API calls
+  const cached = await CacheManager.get<Beer>(cacheKey);
+  if (cached) {
+    console.log('📦 Using cached random beer');
+    return cached;
+  }
+
   try {
-    // For random beer, search for common beer terms
-    const commonTerms = ['ipa', 'lager', 'ale', 'stout', 'pilsner', 'wheat'];
-    const randomTerm = commonTerms[Math.floor(Math.random() * commonTerms.length)];
-    
     console.log(`🔍 Searching for random beer with term: ${randomTerm}`);
     const data = await makeRapidApiRequest('/', { name: randomTerm });
     
@@ -235,22 +310,53 @@ export const getRandomBeer = async (): Promise<Beer | null> => {
     
     if (beers.length > 0) {
       const randomIndex = Math.floor(Math.random() * beers.length);
-      console.log(`✅ Selected random beer: ${beers[randomIndex].name}`);
-      return transformBeerData(beers[randomIndex]);
+      const randomBeer = transformBeerData(beers[randomIndex]);
+      
+      // Cache the random beer
+      await CacheManager.set(cacheKey, randomBeer);
+      console.log(`✅ Selected and cached random beer: ${randomBeer.name}`);
+      return randomBeer;
     }
     
     // Fallback to random beer from our fallback data
     const randomIndex = Math.floor(Math.random() * fallbackBeers.length);
-    console.log(`🔄 Using fallback random beer: ${fallbackBeers[randomIndex].name}`);
-    return fallbackBeers[randomIndex];
+    const fallbackBeer = fallbackBeers[randomIndex];
+    
+    // Cache the fallback beer too
+    await CacheManager.set(cacheKey, fallbackBeer);
+    console.log(`🔄 Using and caching fallback random beer: ${fallbackBeer.name}`);
+    return fallbackBeer;
   } catch (error: any) {
     console.log('💥 Error in getRandomBeer:', error.message);
     
+    // If it's a rate limit error, immediately use fallback without retry
+    if (error instanceof AppError && error.code === 'RATE_LIMIT_EXCEEDED') {
+      console.log('🚫 Rate limit hit, using fallback data');
+      const randomIndex = Math.floor(Math.random() * fallbackBeers.length);
+      const fallbackBeer = fallbackBeers[randomIndex];
+      
+      // Still cache the fallback to avoid repeated API calls
+      await CacheManager.set(cacheKey, fallbackBeer);
+      console.log(`🔄 Using fallback due to rate limit: ${fallbackBeer.name}`);
+      return fallbackBeer;
+    }
+    
+    // Try to return cached data for other errors
+    const cached = await CacheManager.get<Beer>(cacheKey);
+    if (cached) {
+      console.log('🔄 Using cached random beer due to API error');
+      return cached;
+    }
+
     if (error instanceof AppError && error.code === 'NOT_FOUND') {
       // Random search didn't find anything, use fallback
       const randomIndex = Math.floor(Math.random() * fallbackBeers.length);
-      console.log(`🔄 Using fallback random beer due to NOT_FOUND: ${fallbackBeers[randomIndex].name}`);
-      return fallbackBeers[randomIndex];
+      const fallbackBeer = fallbackBeers[randomIndex];
+      
+      // Cache the fallback
+      await CacheManager.set(cacheKey, fallbackBeer);
+      console.log(`🔄 Using fallback random beer due to NOT_FOUND: ${fallbackBeer.name}`);
+      return fallbackBeer;
     }
     
     if (error instanceof AppError) throw error;
@@ -262,8 +368,12 @@ export const getRandomBeer = async (): Promise<Beer | null> => {
       // Use random fallback beer
       await delay(500);
       const randomIndex = Math.floor(Math.random() * fallbackBeers.length);
-      console.log(`🔄 Using fallback random beer: ${fallbackBeers[randomIndex].name}`);
-      return fallbackBeers[randomIndex];
+      const fallbackBeer = fallbackBeers[randomIndex];
+      
+      // Cache the fallback
+      await CacheManager.set(cacheKey, fallbackBeer);
+      console.log(`🔄 Using and caching fallback random beer: ${fallbackBeer.name}`);
+      return fallbackBeer;
     }
     
     throw handleApiError(error);
@@ -274,6 +384,14 @@ export const getRandomBeer = async (): Promise<Beer | null> => {
 export const getBeerById = async (id: string): Promise<Beer | null> => {
   console.log(`🔍 Getting beer by ID: ${id}`);
   
+  // Check cache first
+  const cacheKey = getBeerCacheKey(id, 'search');
+  const cached = await CacheManager.get<Beer>(cacheKey);
+  if (cached) {
+    console.log('📦 Using cached beer by ID');
+    return cached;
+  }
+
   try {
     // Try searching by name first, then by SKU
     let data;
@@ -296,19 +414,31 @@ export const getBeerById = async (id: string): Promise<Beer | null> => {
     }
     
     if (beers.length > 0) {
-      console.log(`✅ Found beer by ID: ${beers[0].name}`);
-      return transformBeerData(beers[0]);
+      const beer = transformBeerData(beers[0]);
+      // Cache the result
+      await CacheManager.set(cacheKey, beer);
+      console.log(`✅ Found and cached beer by ID: ${beer.name}`);
+      return beer;
     }
     
     // Fallback to our fallback data
     const fallbackBeer = fallbackBeers.find(beer => beer.id === id);
     if (fallbackBeer) {
-      console.log(`🔄 Using fallback beer for ID: ${fallbackBeer.name}`);
+      // Cache the fallback
+      await CacheManager.set(cacheKey, fallbackBeer);
+      console.log(`🔄 Using and caching fallback beer for ID: ${fallbackBeer.name}`);
     }
     return fallbackBeer || null;
   } catch (error: any) {
     console.log('💥 Error in getBeerById:', error.message);
     
+    // Try to return cached data
+    const cached = await CacheManager.get<Beer>(cacheKey);
+    if (cached) {
+      console.log('🔄 Using cached beer by ID due to API error');
+      return cached;
+    }
+
     if (error instanceof AppError) throw error;
     
     // Handle network errors by returning fallback
@@ -325,6 +455,14 @@ export const getBeerById = async (id: string): Promise<Beer | null> => {
 export const getAllBeers = async (page: number = 1, perPage: number = 10): Promise<Beer[]> => {
   console.log(`📚 Getting all beers, page ${page}, perPage ${perPage}`);
   
+  // Check cache first
+  const cacheKey = getBeerCacheKey(`all_${page}_${perPage}`, 'all');
+  const cached = await CacheManager.get<Beer[]>(cacheKey);
+  if (cached) {
+    console.log('📦 Using cached all beers');
+    return cached;
+  }
+
   try {
     // Since RapidAPI doesn't have a "get all" endpoint, we'll search for common terms
     const commonTerms = ['beer', 'ale', 'lager', 'ipa'];
@@ -358,11 +496,20 @@ export const getAllBeers = async (page: number = 1, perPage: number = 10): Promi
       }
     }
     
-    console.log(`📦 Returning ${allResults.length} beers total`);
+    // Cache the results
+    await CacheManager.set(cacheKey, allResults);
+    console.log(`📦 Returning and caching ${allResults.length} beers total`);
     return allResults.slice(0, perPage);
   } catch (error: any) {
     console.log('💥 Error in getAllBeers:', error.message);
     
+    // Try to return cached data
+    const cached = await CacheManager.get<Beer[]>(cacheKey);
+    if (cached) {
+      console.log('🔄 Using cached all beers due to API error');
+      return cached;
+    }
+
     if (error instanceof AppError) throw error;
     
     // Handle network errors by returning all fallback beers

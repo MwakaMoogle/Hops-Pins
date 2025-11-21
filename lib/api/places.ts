@@ -1,5 +1,7 @@
 // lib/api/places.ts
+import { CacheManager } from '@/lib/cache';
 import { AppError, handleApiError } from '@/lib/errorHandler';
+
 const GOOGLE_PLACES_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
 
 export interface PlaceResult {
@@ -21,13 +23,18 @@ export interface PlaceResult {
     open_now: boolean;
   };
 }
+
 export interface PlacesSearchResponse {
   results: PlaceResult[];
   next_page_token?: string;
   status: string;
 }
 
-// KEEP your existing searchPubsNearby function but UPDATE it
+// Generate cache key for location searches
+const getPlacesCacheKey = (lat: number, lng: number, radius: number) => {
+  return `places_${lat.toFixed(4)}_${lng.toFixed(4)}_${radius}`;
+};
+
 export const searchPubsNearby = async (
   latitude: number, 
   longitude: number, 
@@ -84,12 +91,21 @@ export const searchPubsNearby = async (
   }
 };
 
-// ADD this new function for paginated search
+// ADD this new function for paginated search with caching
 export const searchAllPubsNearby = async (
   latitude: number, 
   longitude: number, 
   radius: number = 2000
 ): Promise<PlaceResult[]> => {
+  // Check cache first
+  const cacheKey = getPlacesCacheKey(latitude, longitude, radius);
+  const cached = await CacheManager.get<PlaceResult[]>(cacheKey);
+  
+  if (cached) {
+    console.log('📦 Using cached pub results for location');
+    return cached;
+  }
+
   let allResults: PlaceResult[] = [];
   let pageToken: string | undefined;
   let requestCount = 0;
@@ -122,9 +138,21 @@ export const searchAllPubsNearby = async (
       index === self.findIndex(p => p.place_id === pub.place_id)
     );
 
+    // Cache the results
+    await CacheManager.set(cacheKey, uniqueResults);
+    console.log(`✅ Cached ${uniqueResults.length} pubs for location`);
+
     return uniqueResults;
   } catch (error: any) {
     console.error('Error in paginated search:', error);
+    
+    // Try to return cached data even if API fails
+    const cached = await CacheManager.get<PlaceResult[]>(cacheKey);
+    if (cached) {
+      console.log('🔄 Using cached pub data due to API error');
+      return cached;
+    }
+    
     // Return whatever we've collected so far
     return allResults;
   }
@@ -132,6 +160,15 @@ export const searchAllPubsNearby = async (
 
 // KEEP your existing getPlaceDetails function
 export const getPlaceDetails = async (placeId: string): Promise<PlaceResult | null> => {
+  // Check cache first for place details
+  const cacheKey = `place_details_${placeId}`;
+  const cached = await CacheManager.get<PlaceResult>(cacheKey);
+  
+  if (cached) {
+    console.log('📦 Using cached place details');
+    return cached;
+  }
+
   try {
     if (!GOOGLE_PLACES_API_KEY) {
       throw new AppError('Google Places API key not configured', 'CONFIG_ERROR');
@@ -148,6 +185,8 @@ export const getPlaceDetails = async (placeId: string): Promise<PlaceResult | nu
     const data = await response.json();
     
     if (data.status === 'OK') {
+      // Cache the place details
+      await CacheManager.set(cacheKey, data.result);
       return data.result;
     } else {
       throw new AppError(`Google Places details error: ${data.status}`, 'PLACES_API_ERROR');
