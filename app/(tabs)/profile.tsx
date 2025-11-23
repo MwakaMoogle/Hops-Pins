@@ -1,15 +1,33 @@
 // app/(tabs)/profile.tsx
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useGuestContext } from '@/contexts/GuestContext';
+import { RequestBudget } from '@/lib/api/beer';
 import { CacheManager } from '@/lib/cache';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
 const Profile = () => {
   const { user, userProfile, logout, isAuthenticated } = useAuthContext();
   const { isGuest, setGuest } = useGuestContext();
   const router = useRouter();
+  const [requestCount, setRequestCount] = useState(0);
+  const [cacheStats, setCacheStats] = useState({ totalItems: 0 });
+
+  useEffect(() => {
+    loadBudgetInfo();
+    loadCacheStats();
+  }, []);
+
+  const loadBudgetInfo = async () => {
+    const count = await RequestBudget.getCount();
+    setRequestCount(count);
+  };
+
+  const loadCacheStats = async () => {
+    const stats = await CacheManager.getStats();
+    setCacheStats(stats);
+  };
 
   const handleLogout = async () => {
     try {
@@ -32,6 +50,7 @@ const Profile = () => {
   const clearCache = async () => {
     try {
       await CacheManager.clear();
+      await loadCacheStats();
       Alert.alert('Success', 'Cache cleared successfully!');
     } catch (error) {
       Alert.alert('Error', 'Failed to clear cache. Please try again.');
@@ -39,12 +58,8 @@ const Profile = () => {
   };
 
   const getCacheStats = async () => {
-    try {
-      const stats = await CacheManager.getStats();
-      Alert.alert('Cache Info', `Total cached items: ${stats.totalItems}`);
-    } catch (error) {
-      Alert.alert('Error', 'Could not get cache information.');
-    }
+    await loadCacheStats();
+    Alert.alert('Cache Info', `Total cached items: ${cacheStats.totalItems}`);
   };
 
   return (
@@ -96,6 +111,25 @@ const Profile = () => {
               <Text className="text-purple-600">Please sign in to access your profile</Text>
             </>
           )}
+        </View>
+
+        {/* API Usage Info */}
+        <View className="bg-blue-50 rounded-xl p-4 mb-6 border border-blue-200">
+          <Text className="text-lg font-bold text-blue-800 mb-2">API Usage</Text>
+          <Text className="text-blue-600">
+            Requests this month: {requestCount}/450
+          </Text>
+          <Text className="text-blue-500 text-sm mt-1">
+            {requestCount >= 400 
+              ? '⚠️ Approaching limit' 
+              : requestCount >= 300
+              ? 'ℹ️ Moderate usage'
+              : '✅ Within budget'
+            }
+          </Text>
+          <Text className="text-blue-500 text-sm mt-2">
+            Cached items: {cacheStats.totalItems}
+          </Text>
         </View>
 
         {/* Action Buttons */}
@@ -150,14 +184,14 @@ const Profile = () => {
               onPress={clearCache}
               className="bg-yellow-500 py-3 rounded-lg items-center mb-3"
             >
-              <Text className="text-white font-semibold">Clear Cache</Text>
+              <Text className="text-white font-semibold">Clear Local Cache</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={getCacheStats}
-              className="bg-blue-500 py-3 rounded-lg items-center"
+              className="bg-blue-500 py-3 rounded-lg items-center mb-3"
             >
-              <Text className="text-white font-semibold">Cache Info</Text>
+              <Text className="text-white font-semibold">Refresh Cache Info</Text>
             </TouchableOpacity>
 
             <Text className="text-gray-500 text-sm text-center mt-3">

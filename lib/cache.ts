@@ -3,9 +3,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export class CacheManager {
   private static readonly CACHE_PREFIX = 'hops_pins_cache_';
-  private static readonly DEFAULT_TTL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+  private static readonly BEER_TTL = 30 * 24 * 60 * 60 * 1000; // 30 DAYS for beer data
+  private static readonly PLACES_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days for places data
 
-  static async get<T>(key: string): Promise<T | null> {
+  static async get<T>(key: string, ttl: number = this.BEER_TTL): Promise<T | null> {
     try {
       const cached = await AsyncStorage.getItem(`${this.CACHE_PREFIX}${key}`);
       if (!cached) return null;
@@ -13,7 +14,7 @@ export class CacheManager {
       const { data, timestamp } = JSON.parse(cached);
       
       // Check if cache is expired
-      if (Date.now() - timestamp > this.DEFAULT_TTL) {
+      if (Date.now() - timestamp > ttl) {
         await this.remove(key);
         return null;
       }
@@ -55,7 +56,6 @@ export class CacheManager {
     }
   }
 
-  // Add this method to get all cache keys
   static async getAllKeys(): Promise<string[]> {
     try {
       const keys = await AsyncStorage.getAllKeys();
@@ -66,8 +66,7 @@ export class CacheManager {
     }
   }
 
-  // Add this method to get cache stats
-  static async getStats(): Promise<{ totalItems: number; totalSize?: number }> {
+  static async getStats(): Promise<{ totalItems: number }> {
     try {
       const keys = await this.getAllKeys();
       return { totalItems: keys.length };

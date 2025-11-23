@@ -11,7 +11,9 @@
       "@/assets/*": ["./assets/*"],
       "@/types/*": ["./types/*"],
       "@/data/*": ["./data/*"],
-      "@/contexts/*": ["./contexts/*"]
+      "@/contexts/*": ["./contexts/*"],
+      // Add this for Firebase v10+ React Native types
+      "@firebase/auth": ["./node_modules/@firebase/auth/dist/index.rn.d.ts"]
     },
     "resolveJsonModule": true,
     "esModuleInterop": true

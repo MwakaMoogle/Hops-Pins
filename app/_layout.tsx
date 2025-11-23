@@ -1,4 +1,4 @@
-// app/_layout.tsx
+// app/_layout.tsx - temporarily add this line
 import { AuthProvider } from '@/contexts/AuthContext';
 import { GuestProvider } from '@/contexts/GuestContext';
 import { Stack } from 'expo-router';
