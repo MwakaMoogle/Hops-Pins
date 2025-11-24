@@ -6,6 +6,7 @@ import { CacheManager } from '@/lib/cache';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import ImageTest from '../components/ImageTest';
 
 const Profile = () => {
   const { user, userProfile, logout, isAuthenticated } = useAuthContext();
@@ -131,6 +132,8 @@ const Profile = () => {
             Cached items: {cacheStats.totalItems}
           </Text>
         </View>
+
+        <ImageTest />
 
         {/* Action Buttons */}
         <View className="space-y-4">

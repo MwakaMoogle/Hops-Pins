@@ -1,7 +1,8 @@
-// app/pubs/[id].tsx
+// app/pubs/[id].tsx - UPDATED
 import CheckinHistory from '@/components/CheckinHistory';
 import DrinkSearch from '@/components/DrinkSearch';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import PubImage from '@/components/PubImage';
 import { useAuth } from '@/hooks/useAuth';
 import { usePubs } from '@/hooks/usePubs';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -52,11 +53,9 @@ const PubDetails = () => {
         note: note || `Rated ${rating} stars`
       });
       
-      // Reload checkins after successful checkin
       loadPubCheckins(pub!.id);
       
       Alert.alert('Success!', `Checked in at ${pub!.name} with ${selectedDrink} ⭐${rating}`);
-      // Reset form
       setSelectedDrink('');
       setRating(0);
       setNote('');
@@ -99,10 +98,29 @@ const PubDetails = () => {
         >
           <Text className="text-white text-lg">←</Text>
         </TouchableOpacity>
-        <Text className="text-3xl font-bold text-white text-center mt-4">{pub.name}</Text>
+        
+        {/* Pub Image in Header */}
+        <View className="items-center mt-8">
+          <PubImage 
+            imageUrl={pub.imageUrl}
+            pubName={pub.name}
+            size="large"
+            className="mb-4"
+          />
+        </View>
+        
+        <Text className="text-3xl font-bold text-white text-center mt-2">{pub.name}</Text>
         <Text className="text-purple-200 text-center mt-2">{pub.location.address}</Text>
+        
+        {/* Distance */}
+        {pub.distance && (
+          <Text className="text-purple-200 text-center mt-1">
+            {pub.distance} miles away
+          </Text>
+        )}
       </View>
 
+      {/* Main Content */}
       <View className="p-4">
         {/* Stats Cards */}
         <View className="flex-row justify-between mb-6">
@@ -120,13 +138,11 @@ const PubDetails = () => {
         <View className="bg-white border border-gray-200 rounded-xl p-5 mb-6 shadow-sm">
           <Text className="text-xl font-bold text-gray-800 mb-4">Check In</Text>
           
-          {/* Enhanced Drink Search */}
           <DrinkSearch 
             onDrinkSelect={setSelectedDrink}
             selectedDrink={selectedDrink}
           />
 
-          {/* Current Selection Display */}
           {selectedDrink && (
             <View className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
               <Text className="text-green-800 font-medium">
@@ -135,7 +151,6 @@ const PubDetails = () => {
             </View>
           )}
 
-          {/* Rating */}
           <Text className="text-sm font-medium text-gray-700 mb-3">Rate this pub:</Text>
           <View className="flex-row justify-center mb-4">
             {[1, 2, 3, 4, 5].map((star) => (
@@ -151,17 +166,6 @@ const PubDetails = () => {
             ))}
           </View>
 
-          {/* Optional Note */}
-          <View className="mb-4">
-            <Text className="text-sm font-medium text-gray-700 mb-2">Add a note (optional):</Text>
-            <View className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-              <Text className="text-gray-800">
-                {note || 'Great atmosphere, friendly staff...'}
-              </Text>
-            </View>
-          </View>
-
-          {/* Check-in Button */}
           <TouchableOpacity
             onPress={handleCheckin}
             disabled={checkinLoading || !selectedDrink || rating === 0}

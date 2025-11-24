@@ -1,45 +1,53 @@
-// lib/api/places.ts
+// lib/api/places.ts - FIXED VERSION
 import { CacheManager } from '@/lib/cache';
 import { AppError, handleApiError } from '@/lib/errorHandler';
 
 const GOOGLE_PLACES_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
 
 export interface PlaceResult {
-  place_id: string;
-  name: string;
-  formatted_address?: string;
-  vicinity?: string;
-  geometry: {
-    location: {
-      lat: number;
-      lng: number;
-    };
+  id: string;
+  displayName: {
+    text: string;
   };
-  rating?: number;
+  formattedAddress: string;
+  location: {
+    latitude: number;
+    longitude: number;
+  };
   photos?: Array<{
-    photo_reference: string;
+    name: string;
+    widthPx: number;
+    heightPx: number;
+    authorAttributions: Array<{
+      displayName: string;
+      photoUri: string;
+      uri: string;
+    }>;
   }>;
-  opening_hours?: {
-    open_now: boolean;
+  rating?: number;
+  userRatingCount?: number;
+  currentOpeningHours?: {
+    openNow: boolean;
+    weekdayDescriptions: string[];
   };
+  internationalPhoneNumber?: string;
+  websiteUri?: string;
 }
 
 export interface PlacesSearchResponse {
-  results: PlaceResult[];
-  next_page_token?: string;
-  status: string;
+  places: PlaceResult[];
 }
 
 // Generate cache key for location searches
 const getPlacesCacheKey = (lat: number, lng: number, radius: number) => {
-  return `places_${lat.toFixed(4)}_${lng.toFixed(4)}_${radius}`;
+  return `places_v1_${lat.toFixed(4)}_${lng.toFixed(4)}_${radius}`;
 };
 
+// New Nearby Search using Places API v1 - SIMPLIFIED
 export const searchPubsNearby = async (
   latitude: number, 
   longitude: number, 
-  radius: number = 2000, // Reduced radius for better accuracy
-  pageToken?: string
+  radius: number = 5000 // meters
 ): Promise<PlacesSearchResponse> => {
   try {
     if (!GOOGLE_PLACES_API_KEY) {
@@ -50,15 +58,42 @@ export const searchPubsNearby = async (
       );
     }
 
-    let url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=${radius}&type=bar&keyword=pub&key=${GOOGLE_PLACES_API_KEY}`;
+    const url = `https://places.googleapis.com/v1/places:searchNearby`;
     
-    if (pageToken) {
-      url += `&pagetoken=${pageToken}`;
-    }
+    // Simplified request body - only required fields
+    const requestBody = {
+      includedTypes: ['bar'],
+      maxResultCount: 20,
+      locationRestriction: {
+        circle: {
+          center: {
+            latitude,
+            longitude
+          },
+          radius
+        }
+      }
+    };
 
-    const response = await fetch(url);
+    // Simplified field mask
+    const fieldMask = 'places.id,places.displayName,places.formattedAddress,places.location,places.photos';
+
+    console.log('🔍 Making Places API request...');
+    console.log('📍 Location:', latitude, longitude);
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': GOOGLE_PLACES_API_KEY,
+        'X-Goog-FieldMask': fieldMask
+      },
+      body: JSON.stringify(requestBody)
+    });
     
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Places API error:', errorText);
       throw new AppError(
         `HTTP error! status: ${response.status}`,
         'HTTP_ERROR',
@@ -67,35 +102,41 @@ export const searchPubsNearby = async (
     }
     
     const data = await response.json();
+    console.log('✅ Places API response received');
     
-    if (data.status === 'OK') {
-      return {
-        results: data.results.filter((place: any) => 
-          place.name && place.geometry?.location
-        ),
-        next_page_token: data.next_page_token,
-        status: data.status
-      };
-    } else if (data.status === 'ZERO_RESULTS') {
-      return { results: [], status: data.status };
+    if (data.places && data.places.length > 0) {
+      console.log('📊 Total places found:', data.places.length);
+      
+      // Return all bars found (no filtering by name)
+      return { places: data.places };
     } else {
-      throw new AppError(
-        `Google Places API error: ${data.status}`,
-        'PLACES_API_ERROR',
-        'Unable to search for pubs at this time.'
-      );
+      console.log('❌ No places found in response');
+      return { places: [] };
     }
   } catch (error: any) {
+    console.error('❌ Error in searchPubsNearby:', error);
     if (error instanceof AppError) throw error;
     throw handleApiError(error);
   }
 };
 
-// ADD this new function for paginated search with caching
+// Get photo URL using new Places API v1
+export const getPlacePhotoUrl = (photoName: string, maxWidth: number = 400, maxHeight: number = 400): string => {
+  const apiKey = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
+  if (!apiKey) {
+    console.warn('Google Places API key not configured for photos');
+    return '';
+  }
+  
+  // New Places API v1 photo URL format
+  return `https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=${maxWidth}&maxHeightPx=${maxHeight}&key=${apiKey}`;
+};
+
+// Updated searchAllPubsNearby for new API
 export const searchAllPubsNearby = async (
   latitude: number, 
   longitude: number, 
-  radius: number = 2000
+  radius: number = 5000
 ): Promise<PlaceResult[]> => {
   // Check cache first
   const cacheKey = getPlacesCacheKey(latitude, longitude, radius);
@@ -106,45 +147,23 @@ export const searchAllPubsNearby = async (
     return cached;
   }
 
-  let allResults: PlaceResult[] = [];
-  let pageToken: string | undefined;
-  let requestCount = 0;
-  const maxRequests = 3; // Google allows max 3 pages (60 results)
-
   try {
-    do {
-      // Google requires a short delay between page requests
-      if (pageToken) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
+    const response: PlacesSearchResponse = await searchPubsNearby(latitude, longitude, radius);
+    
+    if (response.places.length === 0) {
+      console.log('❌ No pubs found in search');
+      return [];
+    }
 
-      const response: PlacesSearchResponse = await searchPubsNearby(
-        latitude, longitude, radius, pageToken
-      );
-      
-      allResults = [...allResults, ...response.results];
-      pageToken = response.next_page_token;
-      requestCount++;
-
-      // Stop if no more pages or reached max requests
-      if (!pageToken || requestCount >= maxRequests) {
-        break;
-      }
-
-    } while (pageToken && requestCount < maxRequests);
-
-    // Remove duplicates by place_id
-    const uniqueResults = allResults.filter((pub, index, self) =>
-      index === self.findIndex(p => p.place_id === pub.place_id)
-    );
-
+    console.log(`✅ Found ${response.places.length} places with new API`);
+    
     // Cache the results
-    await CacheManager.set(cacheKey, uniqueResults);
-    console.log(`✅ Cached ${uniqueResults.length} pubs for location`);
+    await CacheManager.set(cacheKey, response.places);
+    console.log(`✅ Cached ${response.places.length} places for location`);
 
-    return uniqueResults;
+    return response.places;
   } catch (error: any) {
-    console.error('Error in paginated search:', error);
+    console.error('Error in searchAllPubsNearby:', error);
     
     // Try to return cached data even if API fails
     const cached = await CacheManager.get<PlaceResult[]>(cacheKey);
@@ -153,15 +172,28 @@ export const searchAllPubsNearby = async (
       return cached;
     }
     
-    // Return whatever we've collected so far
-    return allResults;
+    return [];
   }
 };
 
-// KEEP your existing getPlaceDetails function
+// Test function to verify API access - NOW EXPORTED
+export const testPlacesApiAccess = async (latitude: number, longitude: number): Promise<boolean> => {
+  try {
+    console.log('🧪 Testing Places API access...');
+    const response = await searchPubsNearby(latitude, longitude, 1000);
+    console.log('✅ Places API test successful');
+    console.log(`📊 Found ${response.places.length} places in test`);
+    return true;
+  } catch (error: any) {
+    console.error('❌ Places API test failed:', error);
+    return false;
+  }
+};
+
+// Get place details using new API
 export const getPlaceDetails = async (placeId: string): Promise<PlaceResult | null> => {
   // Check cache first for place details
-  const cacheKey = `place_details_${placeId}`;
+  const cacheKey = `place_details_v1_${placeId}`;
   const cached = await CacheManager.get<PlaceResult>(cacheKey);
   
   if (cached) {
@@ -174,9 +206,18 @@ export const getPlaceDetails = async (placeId: string): Promise<PlaceResult | nu
       throw new AppError('Google Places API key not configured', 'CONFIG_ERROR');
     }
 
-    const response = await fetch(
-      `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,formatted_address,geometry,rating,photos,opening_hours&key=${GOOGLE_PLACES_API_KEY}`
-    );
+    const url = `https://places.googleapis.com/v1/places/${placeId}`;
+    
+    const fieldMask = 'id,displayName,formattedAddress,location,photos,rating,userRatingCount,currentOpeningHours,internationalPhoneNumber,websiteUri';
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': GOOGLE_PLACES_API_KEY,
+        'X-Goog-FieldMask': fieldMask
+      }
+    });
     
     if (!response.ok) {
       throw new AppError(`HTTP error! status: ${response.status}`, 'HTTP_ERROR');
@@ -184,12 +225,12 @@ export const getPlaceDetails = async (placeId: string): Promise<PlaceResult | nu
     
     const data = await response.json();
     
-    if (data.status === 'OK') {
+    if (data) {
       // Cache the place details
-      await CacheManager.set(cacheKey, data.result);
-      return data.result;
+      await CacheManager.set(cacheKey, data);
+      return data;
     } else {
-      throw new AppError(`Google Places details error: ${data.status}`, 'PLACES_API_ERROR');
+      throw new AppError('Place not found', 'PLACES_API_ERROR');
     }
   } catch (error: any) {
     if (error instanceof AppError) throw error;

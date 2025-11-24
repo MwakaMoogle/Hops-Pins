@@ -1,12 +1,15 @@
-// app/components/pubCard.tsx
+// app/components/pubCard.tsx - UPDATED
 import { usePubs } from '@/hooks/usePubs';
+import { useRouter } from 'expo-router';
 import React from 'react';
-import { Text, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import ErrorDisplay from './ErrorDisplay';
 import LoadingSpinner from './LoadingSpinner';
+import PubImage from './PubImage';
 
 const PubCard = () => {
   const { pubs, loading, error, loadPubs } = usePubs();
+  const router = useRouter();
 
   if (loading && pubs.length === 0) {
     return (
@@ -29,7 +32,7 @@ const PubCard = () => {
       <View className='flex-1 p-4 w-full min-h-50' style={{ maxHeight: 160 }}>
         <View className='flex-1 bg-green-200 rounded-lg justify-center items-center p-4'>
           <Text className="text-center text-gray-600">
-            No pubs found yet.{'\n'}Tap the map to search for pubs near London!
+            No pubs found yet.{'\n'}Tap the map to search for pubs!
           </Text>
         </View>
       </View>
@@ -39,30 +42,56 @@ const PubCard = () => {
   return (
     <View className='flex-1 p-4 w-full'>
       {pubs.slice(0, 3).map((pub) => (
-        <View 
-          key={pub.id} 
-          className='flex-1 bg-green-200 rounded-lg justify-center mb-4 p-4' 
-          style={{ maxHeight: 160 }}
+        <TouchableOpacity
+          key={pub.id}
+          onPress={() => router.push(`/pubs/${pub.id}`)}
+          className='flex-1 bg-white rounded-xl mb-4 p-4 shadow-sm border border-gray-200'
+          style={{ maxHeight: 140 }}
         >
-          <View className="flex-row items-center">
-            <View className="w-1/3 items-center">
-              <View className="bg-green-400 w-16 h-16 rounded-full items-center justify-center">
-                <Text className="text-white font-bold text-2xl">🍺</Text>
-              </View>
+          <View className="flex-row items-center h-full">
+            {/* Pub Image using new component */}
+            <View className="w-1/3 h-full items-center justify-center">
+              <PubImage 
+                imageUrl={pub.imageUrl}
+                pubName={pub.name}
+                size="medium"
+              />
             </View>
-            <View className="w-2/3 pl-3 justify-center">
+            
+            {/* Pub Details */}
+            <View className="w-2/3 pl-4 justify-center h-full">
               <Text className="text-lg font-bold mb-1" numberOfLines={1}>
                 {pub.name}
               </Text>
-              <Text className="text-sm text-gray-600 mb-1" numberOfLines={2}>
+              <Text className="text-sm text-gray-600 mb-2" numberOfLines={2}>
                 {pub.location.address}
               </Text>
-              <Text className="text-xs text-gray-500">
-                Checkins: {pub.totalCheckins} • Rating: {pub.averageRating}/5
-              </Text>
+              
+              {/* Rating and Checkins */}
+              <View className="flex-row items-center mb-2">
+                <View className="flex-row items-center mr-4">
+                  <Text className="text-xs text-yellow-500">⭐</Text>
+                  <Text className="text-xs text-gray-700 ml-1 font-medium">
+                    {pub.averageRating}/5
+                  </Text>
+                </View>
+                <View className="flex-row items-center">
+                  <Text className="text-xs text-gray-500">👥</Text>
+                  <Text className="text-xs text-gray-700 ml-1 font-medium">
+                    {pub.totalCheckins}
+                  </Text>
+                </View>
+              </View>
+              
+              {/* Distance */}
+              {pub.distance && (
+                <Text className="text-xs text-purple-600 font-medium">
+                  {pub.distance} miles away
+                </Text>
+              )}
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
       ))}
     </View>
   );
