@@ -1,5 +1,5 @@
-// hooks/usePubs.ts - UPDATED FOR NEW PLACES API
-import { searchAllPubsNearby, testPlacesApiAccess } from '@/lib/api/places';
+// hooks/usePubs.ts - FIXED imports and function names
+import { getPlaceDetails, getPlacePhotoUrl, searchAllPubsNearby } from '@/lib/api/places'; // Add getPlaceDetails and getPlacePhotoUrl
 import { Pub, addCheckin, addPub, calculateDistance, getPubByPlaceId, getPubCheckins, getPubs } from '@/lib/api/pubs';
 import { AppError } from '@/lib/errorHandler';
 import { MapMarker } from '@/types/map';
@@ -21,7 +21,33 @@ export const usePubs = () => {
       }
       
       const pubsData = await getPubs(lat, lng);
-      setPubs(pubsData);
+      
+      // Check for pubs without images and try to fetch them
+      const pubsWithImages = await Promise.all(
+        pubsData.map(async (pub) => {
+          if (!pub.imageUrl && pub.placeId) {
+            console.log('🔄 Pub missing image, fetching details:', pub.name);
+            try {
+              const placeDetails = await getPlaceDetails(pub.placeId); // This should work now
+              if (placeDetails?.photos?.[0]?.name) {
+                const imageUrl = getPlacePhotoUrl(placeDetails.photos[0].name); // This should work now
+                console.log('✅ Found image for existing pub:', pub.name);
+                
+                // Return the pub with the image URL
+                return {
+                  ...pub,
+                  imageUrl
+                };
+              }
+            } catch (error) {
+              console.log('❌ Failed to fetch image for pub:', pub.name);
+            }
+          }
+          return pub;
+        })
+      );
+      
+      setPubs(pubsWithImages);
     } catch (error: any) {
       console.error('Error loading pubs:', error);
       if (error instanceof AppError) {
@@ -34,23 +60,14 @@ export const usePubs = () => {
     }
   };
 
- const searchNearbyPubs = async (latitude: number, longitude: number) => {
+  const searchNearbyPubs = async (latitude: number, longitude: number) => {
     setLoading(true);
     setError(null);
     try {
-      // Test API access first
-      console.log('🧪 Testing Places API access...');
-      const apiAccess = await testPlacesApiAccess(latitude, longitude);
-      
-      if (!apiAccess) {
-        throw new AppError(
-          'Places API access failed',
-          'API_ACCESS_ERROR',
-          'Unable to connect to location services. Please try again.'
-        );
-      }
+      console.log('🔍 Starting pub search...');
+      console.log('📍 Location:', latitude, longitude);
 
-      // Use the new API search function
+      // Use the new API search function directly
       const places = await searchAllPubsNearby(latitude, longitude);
       
       if (places.length === 0) {
@@ -78,7 +95,7 @@ export const usePubs = () => {
             placeId: place.id,
           };
 
-          // Use the place data directly from search (no need for additional details call)
+          // Use the place data directly from search
           const pubId = await addPub(pubData, place);
           const newPub = await getPubByPlaceId(place.id);
           

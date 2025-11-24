@@ -225,3 +225,16 @@ export const getPubCheckins = async (pubId: string): Promise<Checkin[]> => {
     return [];
   }
 };
+
+export const updatePubWithImage = async (pubId: string, imageUrl: string): Promise<void> => {
+  try {
+    const pubRef = doc(db, 'pubs', pubId);
+    await updateDoc(pubRef, {
+      imageUrl: imageUrl
+    });
+    console.log('✅ Updated pub with image:', pubId);
+  } catch (error: any) {
+    console.error('Error updating pub with image:', error);
+    throw handleFirebaseError(error);
+  }
+};

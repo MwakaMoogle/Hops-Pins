@@ -2,12 +2,11 @@
 import CheckinHistory from '@/components/CheckinHistory';
 import DrinkSearch from '@/components/DrinkSearch';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import PubImage from '@/components/PubImage';
 import { useAuth } from '@/hooks/useAuth';
 import { usePubs } from '@/hooks/usePubs';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
 const PubDetails = () => {
   const { id } = useLocalSearchParams();
@@ -90,50 +89,63 @@ const PubDetails = () => {
 
   return (
     <ScrollView className="flex-1 bg-white" showsVerticalScrollIndicator={false}>
-      {/* Header Section */}
-      <View className="bg-purple-600 p-6">
+      {/* Enhanced Header with Background Image - UPDATED */}
+      <View className="relative h-64">
+        {pub.imageUrl ? (
+          <View className="flex-1">
+            <Image
+              source={{ uri: pub.imageUrl }}
+              resizeMode="cover"
+              className="flex-1"
+            />
+            {/* Dark overlay for better text readability */}
+            <View className="absolute inset-0 bg-black/40" />
+          </View>
+        ) : (
+          <View className="flex-1 bg-purple-600" />
+        )}
+        
+        {/* Back Button */}
         <TouchableOpacity 
           onPress={() => router.back()}
-          className="absolute top-12 left-4 z-10 bg-white/20 p-2 rounded-full"
+          className="absolute top-12 left-4 z-10 bg-black/50 p-3 rounded-full"
         >
-          <Text className="text-white text-lg">←</Text>
+          <Text className="text-white text-lg font-bold">←</Text>
         </TouchableOpacity>
-        
-        {/* Pub Image in Header */}
-        <View className="items-center mt-8">
-          <PubImage 
-            imageUrl={pub.imageUrl}
-            pubName={pub.name}
-            size="large"
-            className="mb-4"
-          />
+
+        {/* Pub Info Overlay */}
+        <View className="absolute bottom-0 left-0 right-0 p-6">
+          <Text className="text-3xl font-bold text-white mb-2">{pub.name}</Text>
+          <Text className="text-purple-200 text-base">{pub.location.address}</Text>
+          
+          {/* Stats in header */}
+          <View className="flex-row mt-3">
+            <View className="flex-row items-center mr-6">
+              <Text className="text-yellow-400 text-lg">⭐</Text>
+              <Text className="text-white font-medium ml-1">
+                {pub.averageRating}/5
+              </Text>
+            </View>
+            <View className="flex-row items-center mr-6">
+              <Text className="text-white text-lg">👥</Text>
+              <Text className="text-white font-medium ml-1">
+                {pub.totalCheckins}
+              </Text>
+            </View>
+            {pub.distance && (
+              <View className="flex-row items-center">
+                <Text className="text-green-300 font-medium">
+                  {pub.distance} miles
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
-        
-        <Text className="text-3xl font-bold text-white text-center mt-2">{pub.name}</Text>
-        <Text className="text-purple-200 text-center mt-2">{pub.location.address}</Text>
-        
-        {/* Distance */}
-        {pub.distance && (
-          <Text className="text-purple-200 text-center mt-1">
-            {pub.distance} miles away
-          </Text>
-        )}
       </View>
 
-      {/* Main Content */}
       <View className="p-4">
-        {/* Stats Cards */}
-        <View className="flex-row justify-between mb-6">
-          <View className="bg-purple-50 p-4 rounded-lg flex-1 mr-2 items-center">
-            <Text className="text-2xl font-bold text-purple-600">{pub.totalCheckins}</Text>
-            <Text className="text-gray-600 text-sm">Total Check-ins</Text>
-          </View>
-          <View className="bg-green-50 p-4 rounded-lg flex-1 ml-2 items-center">
-            <Text className="text-2xl font-bold text-green-600">{pub.averageRating}/5</Text>
-            <Text className="text-gray-600 text-sm">Average Rating</Text>
-          </View>
-        </View>
-
+        {/* Stats Cards - Removed duplicate stats since they're in header now */}
+        
         {/* Check-in Section */}
         <View className="bg-white border border-gray-200 rounded-xl p-5 mb-6 shadow-sm">
           <Text className="text-xl font-bold text-gray-800 mb-4">Check In</Text>
