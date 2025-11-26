@@ -1,18 +1,20 @@
 // app/(tabs)/history.tsx
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useGuestContext } from '@/contexts/GuestContext';
+import { getUserCheckins } from '@/lib/api/pubs';
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  RefreshControl,
   ScrollView,
   Text,
   TouchableOpacity,
   View
 } from 'react-native';
 
-// Mock data structure - you'll replace this with real data from your checkins
 interface Checkin {
   id: string;
   pubId: string;
@@ -27,66 +29,66 @@ interface Checkin {
 const History = () => {
   const router = useRouter();
   const { user, isAuthenticated } = useAuthContext();
-  const { isGuest } = useGuestContext();
+  const { isGuest } = useGuestContext(); // Remove guestCheckins
   const [checkins, setCheckins] = useState<Checkin[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<'all' | 'recent' | 'favorites'>('all');
 
-  // Mock data - replace with actual API call to getUserCheckins
-  const loadCheckins = async () => {
-    setLoading(true);
+  const loadCheckins = async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     
     try {
-      // TODO: Replace with actual API call
-      // const userCheckins = await getUserCheckins(user.uid);
-      
-      // Mock data for demonstration
-      const mockCheckins: Checkin[] = [
-        {
-          id: '1',
-          pubId: 'pub1',
-          pubName: 'The Red Lion',
-          drink: 'Craft IPA',
-          rating: 5,
-          note: 'Great atmosphere!',
-          createdAt: new Date('2024-01-15'),
-          location: 'London'
-        },
-        {
-          id: '2',
-          pubId: 'pub2',
-          pubName: 'The Crown',
-          drink: 'Guinness',
-          rating: 4,
-          note: 'Perfect pour',
-          createdAt: new Date('2024-01-10'),
-          location: 'London'
-        },
-        {
-          id: '3',
-          pubId: 'pub3',
-          pubName: 'The Rose & Crown',
-          drink: 'Pale Ale',
-          rating: 3,
-          createdAt: new Date('2024-01-05'),
-          location: 'London'
-        }
-      ];
-      
-      setCheckins(mockCheckins);
+      if (isAuthenticated && user) {
+        console.log('🔐 Loading authenticated user checkins for user:', user.uid);
+        const firebaseCheckins = await getUserCheckins(user.uid);
+        console.log('✅ Loaded checkins from Firebase:', firebaseCheckins.length);
+        
+        // Convert Firebase checkins to our component format
+        const userCheckins: Checkin[] = firebaseCheckins.map(fbCheckin => ({
+          id: fbCheckin.id,
+          pubId: fbCheckin.pubId,
+          pubName: fbCheckin.pubName,
+          drink: fbCheckin.drink,
+          rating: fbCheckin.rating,
+          note: fbCheckin.note,
+          createdAt: fbCheckin.createdAt.toDate(),
+          location: 'Location' // You can fetch this from pub document if needed
+        }));
+        
+        setCheckins(userCheckins);
+      } else {
+        // If not authenticated, clear checkins
+        setCheckins([]);
+      }
     } catch (error) {
-      console.error('Error loading checkins:', error);
+      console.error('❌ Error loading checkins:', error);
       Alert.alert('Error', 'Failed to load your check-in history');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
+  // Load checkins when component mounts or auth state changes
   useEffect(() => {
-    if (isAuthenticated || isGuest) {
-      loadCheckins();
-    }
-  }, [isAuthenticated, isGuest]);
+    console.log('🔄 Auth state changed:', { isAuthenticated, isGuest, userId: user?.uid });
+    loadCheckins();
+  }, [isAuthenticated, isGuest, user?.uid]);
+
+  // Refresh when the tab gains focus
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('🎯 History tab focused, refreshing...');
+      if (isAuthenticated) {
+        loadCheckins(true);
+      }
+    }, [isAuthenticated, user?.uid])
+  );
 
   const handlePubPress = (pubId: string) => {
     router.push(`/pubs/${pubId}`);
@@ -96,13 +98,19 @@ const History = () => {
     router.push('/(auth)/login');
   };
 
+  const onRefresh = () => {
+    loadCheckins(true);
+  };
+
   const filteredCheckins = checkins.filter(checkin => {
     if (filter === 'recent') {
       const oneWeekAgo = new Date();
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
       return checkin.createdAt > oneWeekAgo;
     }
-    // Add more filters as needed
+    if (filter === 'favorites') {
+      return checkin.rating >= 4;
+    }
     return true;
   });
 
@@ -115,12 +123,16 @@ const History = () => {
     });
   };
 
-  if (!isAuthenticated && !isGuest) {
+  // Show sign-in prompt for non-authenticated users (including guests)
+  if (!isAuthenticated) {
     return (
       <View className="flex-1 bg-white items-center justify-center p-6">
         <Text className="text-3xl font-bold text-purple-600 mb-4">Your History</Text>
         <Text className="text-lg text-gray-600 text-center mb-8">
-          Sign in to view your check-in history and track your pub visits
+          {isGuest 
+            ? 'Guest users cannot save check-in history. Sign in to track your pub visits!'
+            : 'Sign in to view your check-in history and track your pub visits'
+          }
         </Text>
         
         <TouchableOpacity
@@ -136,6 +148,12 @@ const History = () => {
         >
           <Text className="text-white font-semibold text-lg">Create Account</Text>
         </TouchableOpacity>
+
+        {isGuest && (
+          <Text className="text-gray-500 text-center mt-6">
+            Guest mode is for browsing only. Create an account to save your check-ins and preferences.
+          </Text>
+        )}
       </View>
     );
   }
@@ -146,10 +164,19 @@ const History = () => {
       <View className="bg-purple-600 p-6">
         <Text className="text-3xl font-bold text-white text-center">Your History</Text>
         <Text className="text-purple-200 text-center mt-2">
-          {isGuest ? 'Guest session' : `Welcome back, ${user?.displayName || 'friend'}!`}
+          Welcome back, {user?.displayName || 'friend'}!
         </Text>
+        
+        {/* Refresh Button */}
+        <TouchableOpacity
+          onPress={() => loadCheckins(true)}
+          className="absolute right-4 top-4 bg-purple-800 p-2 rounded-lg"
+        >
+          <Text className="text-white text-sm">Refresh</Text>
+        </TouchableOpacity>
       </View>
 
+      {/* Rest of the component remains the same but only shows for authenticated users */}
       {/* Filter Tabs */}
       <View className="flex-row border-b border-gray-200">
         {['all', 'recent', 'favorites'].map((tab) => (
@@ -170,7 +197,16 @@ const History = () => {
       </View>
 
       {/* Checkins List */}
-      <ScrollView className="flex-1 p-4">
+      <ScrollView 
+        className="flex-1 p-4"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#8B5CF6']}
+          />
+        }
+      >
         {loading ? (
           <View className="items-center py-8">
             <ActivityIndicator size="large" color="#8B5CF6" />
@@ -182,6 +218,8 @@ const History = () => {
             <Text className="text-gray-400 text-center">
               {filter === 'recent' 
                 ? 'No recent check-ins. Visit some pubs!'
+                : filter === 'favorites'
+                ? 'No favorite check-ins yet. Rate some pubs 4+ stars!'
                 : 'Start exploring pubs and check in to see your history here.'
               }
             </Text>
@@ -197,6 +235,7 @@ const History = () => {
           <View>
             <Text className="text-lg font-semibold text-gray-800 mb-4">
               {filteredCheckins.length} Check-in{filteredCheckins.length !== 1 ? 's' : ''}
+              {filter !== 'all' && ` (${checkins.length} total)`}
             </Text>
             
             {filteredCheckins.map((checkin) => (
